@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LedgerFS - File System Forensics</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: fadeInDown 0.6s ease;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .header .subtitle {
+            color: #94a3b8;
+            font-size: 1rem;
+        }
+
+        /* Privacy Badge */
+        .privacy-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #065f46;
+            color: #d1fae5;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-top: 12px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 3px dashed #475569;
+            border-radius: 16px;
+            padding: 60px 40px;
+            text-align: center;
+            background: #1e293b;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 40px;
+            animation: fadeIn 0.8s ease;
+        }
+
+        .drop-zone:hover {
+            border-color: #60a5fa;
+            background: #334155;
+            transform: translateY(-2px);
+        }
+
+        .drop-zone.dragover {
+            border-color: #22c55e;
+            background: #064e3b;
+            transform: scale(1.02);
+        }
+
+        .drop-zone i {
+            font-size: 4rem;
+            color: #60a5fa;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .drop-zone h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            color: #e2e8f0;
+        }
+
+        .drop-zone p {
+            color: #94a3b8;
+            font-size: 0.95rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+            animation: fadeIn 1s ease;
+        }
+
+        .stat-card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #334155;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            border-color: #60a5fa;
+        }
+
+        .stat-card .icon {
+            font-size: 2rem;
+            margin-bottom: 12px;
+        }
+
+        .stat-card .value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .stat-card .label {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-card.total { color: #60a5fa; }
+        .stat-card.deletes { color: #ef4444; }
+        .stat-card.creates { color: #22c55e; }
+        .stat-card.modifies { color: #f59e0b; }
+
+        /* Search Box */
+        .search-box {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 40px;
+            border: 1px solid #334155;
+            animation: fadeIn 1.2s ease;
+        }
+
+        .search-box h3 {
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+            color: #e2e8f0;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+        }
+
+        .search-input-wrapper i {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #64748b;
+            font-size: 1.25rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 16px 16px 16px 48px;
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+        }
+
+        /* Timeline */
+        .timeline-container {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #334155;
+            animation: fadeIn 1.4s ease;
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .timeline-header h3 {
+            font-size: 1.25rem;
+            color: #e2e8f0;
+        }
+
+        .event-count {
+            color: #94a3b8;
+            font-size: 0.875rem;
+        }
+
+        .timeline {
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .timeline::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .timeline::-webkit-scrollbar-track {
+            background: #0f172a;
+            border-radius: 4px;
+        }
+
+        .timeline::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        .timeline::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .event-item {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #0f172a;
+            border-radius: 8px;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .event-item:hover {
+            transform: translateX(4px);
+            background: #1e293b;
+        }
+
+        .event-item.create { border-left-color: #22c55e; }
+        .event-item.modify { border-left-color: #3b82f6; }
+        .event-item.delete { border-left-color: #ef4444; }
+        .event-item.move { border-left-color: #f59e0b; }
+
+        .event-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+
+        .event-item.create .event-icon { background: #065f46; color: #22c55e; }
+        .event-item.modify .event-icon { background: #1e3a8a; color: #3b82f6; }
+        .event-item.delete .event-icon { background: #7f1d1d; color: #ef4444; }
+        .event-item.move .event-icon { background: #78350f; color: #f59e0b; }
+
+        .event-content {
+            flex: 1;
+        }
+
+        .event-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 8px;
+        }
+
+        .event-type {
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .event-item.create .event-type { background: #065f46; color: #d1fae5; }
+        .event-item.modify .event-type { background: #1e3a8a; color: #bfdbfe; }
+        .event-item.delete .event-type { background: #7f1d1d; color: #fecaca; }
+        .event-item.move .event-type { background: #78350f; color: #fed7aa; }
+
+        .event-time {
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+
+        .event-filename {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            margin-bottom: 4px;
+            word-break: break-all;
+        }
+
+        .event-path {
+            font-size: 0.875rem;
+            color: #64748b;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+
+        .event-size {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            margin-top: 4px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 1.25rem;
+            margin-bottom: 8px;
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .event-header-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="fas fa-fingerprint"></i> LedgerFS</h1>
+            <p class="subtitle">File System Forensic Viewer</p>
+            <div class="privacy-badge">
+                <i class="fas fa-lock"></i>
+                Processed Locally - No Data Leaves Your Device
+            </div>
+        </div>
+
+        <!-- Drop Zone -->
+        <div class="drop-zone" id="dropZone">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <h2>Drop your ledger.jsonl here</h2>
+            <p>or click to browse files</p>
+            <input type="file" id="fileInput" accept=".jsonl,.json" style="display: none;">
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid hidden" id="statsGrid">
+            <div class="stat-card total">
+                <div class="icon"><i class="fas fa-chart-line"></i></div>
+                <div class="value" id="totalEvents">0</div>
+                <div class="label">Total Events</div>
+            </div>
+            <div class="stat-card deletes">
+                <div class="icon"><i class="fas fa-trash-alt"></i></div>
+                <div class="value" id="deleteCount">0</div>
+                <div class="label">Files Deleted</div>
+            </div>
+            <div class="stat-card creates">
+                <div class="icon"><i class="fas fa-plus-circle"></i></div>
+                <div class="value" id="createCount">0</div>
+                <div class="label">Files Created</div>
+            </div>
+            <div class="stat-card modifies">
+                <div class="icon"><i class="fas fa-edit"></i></div>
+                <div class="value" id="modifyCount">0</div>
+                <div class="label">Files Modified</div>
+            </div>
+        </div>
+
+        <!-- Search Box -->
+        <div class="search-box hidden" id="searchBox">
+            <h3><i class="fas fa-search"></i> Crisis Search</h3>
+            <div class="search-input-wrapper">
+                <i class="fas fa-search"></i>
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    id="searchInput" 
+                    placeholder="Type filename to investigate... (e.g., report.docx, video.mp4)"
+                >
+            </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="timeline-container hidden" id="timelineContainer">
+            <div class="timeline-header">
+                <h3><i class="fas fa-history"></i> Event Timeline</h3>
+                <div class="event-count" id="eventCount">Showing 0 events</div>
+            </div>
+            <div class="timeline" id="timeline">
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <h3>No events to display</h3>
+                    <p>Upload a ledger file to see the timeline</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let allEvents = [];
+        let filteredEvents = [];
+
+        // DOM elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const statsGrid = document.getElementById('statsGrid');
+        const searchBox = document.getElementById('searchBox');
+        const searchInput = document.getElementById('searchInput');
+        const timelineContainer = document.getElementById('timelineContainer');
+        const timeline = document.getElementById('timeline');
+        const eventCount = document.getElementById('eventCount');
+
+        // Initialize
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+        searchInput.addEventListener('input', handleSearch);
+
+        // Drag & Drop handlers
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                processFile(file);
+            }
+        });
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        function processFile(file) {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    const content = e.target.result;
+                    parseJSONL(content);
+                } catch (error) {
+                    alert('Error reading file: ' + error.message);
+                }
+            };
+
+            reader.readAsText(file);
+        }
+
+        function parseJSONL(content) {
+            const lines = content.trim().split('\n');
+            allEvents = [];
+
+            lines.forEach((line, index) => {
+                try {
+                    if (line.trim()) {
+                        const event = JSON.parse(line);
+                        allEvents.push(event);
+                    }
+                } catch (e) {
+                    console.warn(`Skipping malformed line ${index + 1}`);
+                }
+            });
+
+            if (allEvents.length === 0) {
+                alert('No valid events found in file');
+                return;
+            }
+
+            // Sort by sequence_id
+            allEvents.sort((a, b) => a.sequence_id - b.sequence_id);
+
+            // Show UI
+            dropZone.classList.add('hidden');
+            statsGrid.classList.remove('hidden');
+            searchBox.classList.remove('hidden');
+            timelineContainer.classList.remove('hidden');
+
+            // Render
+            renderStats();
+            filteredEvents = [...allEvents];
+            renderTimeline();
+        }
+
+        function renderStats() {
+            const total = allEvents.length;
+            const deletes = allEvents.filter(e => e.event_type === 'DELETE').length;
+            const creates = allEvents.filter(e => e.event_type === 'CREATE').length;
+            const modifies = allEvents.filter(e => e.event_type === 'MODIFY').length;
+
+            document.getElementById('totalEvents').textContent = total.toLocaleString();
+            document.getElementById('deleteCount').textContent = deletes.toLocaleString();
+            document.getElementById('createCount').textContent = creates.toLocaleString();
+            document.getElementById('modifyCount').textContent = modifies.toLocaleString();
+        }
+
+        function handleSearch(e) {
+            const query = e.target.value.toLowerCase().trim();
+            
+            if (query === '') {
+                filteredEvents = [...allEvents];
+            } else {
+                filteredEvents = allEvents.filter(event => 
+                    event.filename.toLowerCase().includes(query)
+                );
+            }
+
+            renderTimeline();
+        }
+
+        function renderTimeline() {
+            if (filteredEvents.length === 0) {
+                timeline.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-search"></i>
+                        <h3>No events match your search</h3>
+                        <p>Try a different filename</p>
+                    </div>
+                `;
+                eventCount.textContent = 'Showing 0 events';
+                return;
+            }
+
+            // Reverse to show newest first
+            const eventsToShow = [...filteredEvents].reverse();
+            
+            eventCount.textContent = `Showing ${filteredEvents.length.toLocaleString()} event${filteredEvents.length !== 1 ? 's' : ''}`;
+
+            let html = '';
+            eventsToShow.forEach(event => {
+                const eventClass = event.event_type.toLowerCase();
+                const icon = getEventIcon(event.event_type);
+                const time = formatTime(event.timestamp);
+                const size = formatSize(event.size_bytes);
+
+                html += `
+                    <div class="event-item ${eventClass}">
+                        <div class="event-icon">
+                            <i class="fas ${icon}"></i>
+                        </div>
+                        <div class="event-content">
+                            <div class="event-header-row">
+                                <span class="event-type">${event.event_type}</span>
+                                <span class="event-time">${time}</span>
+                            </div>
+                            <div class="event-filename">${escapeHtml(event.filename)}</div>
+                            <div class="event-path">${escapeHtml(event.path)}</div>
+                            ${size ? `<div class="event-size">${size}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            timeline.innerHTML = html;
+        }
+
+        function getEventIcon(eventType) {
+            const icons = {
+                'CREATE': 'fa-file-medical',
+                'MODIFY': 'fa-pen',
+                'DELETE': 'fa-trash-alt',
+                'MOVE': 'fa-arrows-alt'
+            };
+            return icons[eventType] || 'fa-file';
+        }
+
+        function formatTime(timestamp) {
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            } catch (e) {
+                return timestamp;
+            }
+        }
+
+        function formatSize(bytes) {
+            if (!bytes || bytes === null) return '';
+            
+            if (bytes < 1024) {
+                return `${bytes} B`;
+            } else if (bytes < 1024 * 1024) {
+                return `${(bytes / 1024).toFixed(1)} KB`;
+            } else if (bytes < 1024 * 1024 * 1024) {
+                return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+            } else {
+                return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
